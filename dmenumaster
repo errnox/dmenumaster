@@ -1,0 +1,72 @@
+#!/usr/bin/env python
+
+import os
+import string
+import shlex
+import subprocess
+
+
+class DmenuMaster(object):
+  '''DmenuMaster
+  1. reads a file containing a list of commands,
+  2. calls "dmenu" to let the user select a particular one,
+  3. writes rewrites the file by promoting the selected command to the
+     top of the list and
+  4. calls the user-selected command.
+  '''
+  def __init__(self):
+    '''commands_file is the name of the file containing the
+    user-selectable list of commands.
+    '''
+    self.commands_file = os.path.expanduser('~') + '/.bash/commands'
+    self.dmenu_cmd = 'dmenu -l 40 -p "Run &gt;" -nb "#315171" -sb "#ffffff" -sf "#315171"'
+
+  def get_selection(self):
+    '''Invoke "dmenu" and let the user select a command.
+    '''
+    try:
+      selection = subprocess.check_output('cat {} | {}'.format(
+        self.commands_file, self.dmenu_cmd), shell=True)
+      if string.strip(selection) != '':
+        self.promote_selection(selection)
+    finally:
+      exit()
+
+  def promote_selection(self, selection):
+    '''Promote the user-selected command to the top of the list of
+    selectable commands and write this newly sorted list back to the
+    commands_file.
+    '''
+    lines = []
+    promotee = None
+    with open(self.commands_file) as file:
+      for line in file:
+        if line == selection:
+          promotee = line
+        else:
+          lines.append(line)
+    lines = [promotee] + lines
+
+    if promotee != None:
+      with open(self.commands_file, 'w') as file:
+        for line in lines:
+          file.write(line)
+      self.call_selection(string.strip(promotee))
+
+  def call_selection(self, selection):
+    '''Call the user-selected command by forking from the curren process.
+
+    selection    The user-selected command to execute. It should not be
+                 surrounded by any whitespace.
+    '''
+    devnull = open(os.devnull, 'wb')
+    args_list = ['nohup'] + shlex.split(selection)
+    subprocess.Popen(args_list, stdout=devnull, stderr=devnull)
+
+  def run(self):
+    self.get_selection()
+
+
+if __name__ == '__main__':
+  dmaster = DmenuMaster()
+  dmaster.run()
